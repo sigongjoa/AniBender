@@ -150,7 +150,20 @@ def parse_bvh(bvh_file_path, output_dir):
         calculate_global_position("Hips") # Assuming Hips is the root
         all_frame_joint_positions.append(current_joint_positions)
 
-    output_filename = os.path.join(output_dir, os.path.basename(bvh_file_path).replace('.bvh', '_parsed_positions.json'))
+    base_filename_with_person = os.path.basename(bvh_file_path).replace('.bvh', '')
+    # Extract the part before '_person' and the '_personX' part
+    parts = base_filename_with_person.split('_person')
+    if len(parts) > 1:
+        main_part = parts[0]
+        person_part = '_person' + parts[1]
+        # Remove the _lightweight_smoothed_3d_keypoints suffix from the main part
+        if main_part.endswith('_lightweight_smoothed_3d_keypoints'):
+            main_part = main_part.replace('_lightweight_smoothed_3d_keypoints', '')
+        base_filename = main_part + person_part
+    else:
+        base_filename = base_filename_with_person # Fallback if _person not found
+
+    output_filename = os.path.join(output_dir, f'{base_filename}_parsed_positions.json')
     with open(output_filename, 'w') as f:
         json.dump({"frames": all_frame_joint_positions, "hierarchy": {k: {key: val.tolist() if isinstance(val, np.ndarray) else val for key, val in v.items()} for k, v in hierarchy.items()}}, f, indent=4)
     

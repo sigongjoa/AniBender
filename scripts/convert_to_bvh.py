@@ -148,13 +148,11 @@ def convert_to_bvh(input_json_path, output_dir):
         for frame_data in data_3d:
             if len(frame_data["keypoints"]) > person_idx:
                 person_data_3d.append({
-                    "frame_idx": frame_data["frame_idx"],
                     "keypoints": [frame_data["keypoints"][person_idx]] # Wrap in list for consistency
                 })
             else:
                 # If this person is not detected in a frame, add an empty keypoint list
                 person_data_3d.append({
-                    "frame_idx": frame_data["frame_idx"],
                     "keypoints": []
                 })
 
@@ -280,19 +278,18 @@ def convert_to_bvh(input_json_path, output_dir):
                     current_joint_positions_map[bone_name] = person_keypoints_current_frame[valid_kp_indices[0], :3]
                 elif len(valid_kp_indices) == 2:
                     current_joint_positions_map[bone_name] = (person_keypoints_current_frame[valid_kp_indices[0], :3] + person_keypoints_current_frame[valid_kp_indices[1], :3]) / 2
-                else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 17-keypoint array)
-                    else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 19-keypoint array)
-                if bone_name == "Head":
-                    current_joint_positions_map[bone_name] = person_keypoints_current_frame[0, :3] # Nose (index 0)
-                elif bone_name == "Spine":
-                    # Midpoint of Neck and Hips
-                    neck_pos = person_keypoints_current_frame[1, :3]
-                    hips_mid_pos = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2
-                    current_joint_positions_map[bone_name] = (neck_pos + hips_mid_pos) / 2
-                elif bone_name == "Hips":
-                    current_joint_positions_map[bone_name] = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2 # Mid-hip (indices 8, 11)
-                elif bone_name == "Neck":
-                    current_joint_positions_map[bone_name] = person_keypoints_current_frame[1, :3] # Neck (index 1)
+                else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 19-keypoint array)
+                    if bone_name == "Head":
+                        current_joint_positions_map[bone_name] = person_keypoints_current_frame[0, :3] # Nose (index 0)
+                    elif bone_name == "Spine":
+                        # Midpoint of Neck and Hips
+                        neck_pos = person_keypoints_current_frame[1, :3]
+                        hips_mid_pos = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2
+                        current_joint_positions_map[bone_name] = (neck_pos + hips_mid_pos) / 2
+                    elif bone_name == "Hips":
+                        current_joint_positions_map[bone_name] = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2 # Mid-hip (indices 8, 11)
+                    elif bone_name == "Neck":
+                        current_joint_positions_map[bone_name] = person_keypoints_current_frame[1, :3] # Neck (index 1)
 
             # Calculate rotations for each bone
             for bone_name, bone_info in BVH_SKELETON.items():
@@ -327,6 +324,7 @@ def convert_to_bvh(input_json_path, output_dir):
                     rot_z, rot_x, rot_y = rotation_matrix_to_euler_zxy(R)
                     current_frame_motion_data.extend([rot_z, rot_x, rot_y]) # ZXY order
 
+            # This line should be outside the bone iteration loop, once per frame
             bvh_motion.append(" ".join(f"{val:.6f}" for val in current_frame_motion_data))
 
         # Write to file for this person

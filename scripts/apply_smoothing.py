@@ -29,7 +29,6 @@ def apply_smoothing(input_json_path, output_dir):
             smoothed_person_keypoints_list.append(person_keypoints_3d)
         
         smoothed_data_3d.append({
-            "frame_idx": frame_data["frame_idx"],
             "keypoints": smoothed_person_keypoints_list
         })
 
