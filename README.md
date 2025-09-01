@@ -81,10 +81,18 @@ Or place your video file directly into the `input_videos/` directory.
 
 Choose one of the pipelines below to process your video.
 
-#### a) Run YOLO + VideoPose3D Pipeline
+#### a) Run YOLO + VideoPose3d Pipeline
+
+To run the pipeline with a sample video:
 
 ```bash
-venv/bin/python run_yolo_videopose3d_pipeline.py --video_path "input_videos/your_video.mp4" --output_base_dir output_data
+/mnt/d/progress/ani_bender/venv/bin/python run_yolo_videopose3d_pipeline.py --video_path sample_video.mp4
+```
+
+To run with your own video:
+
+```bash
+/mnt/d/progress/ani_bender/venv/bin/python run_yolo_videopose3d_pipeline.py --video_path "input_videos/your_video.mp4" --output_base_dir output_data
 ```
 
 #### b) Run VIBE Pipeline

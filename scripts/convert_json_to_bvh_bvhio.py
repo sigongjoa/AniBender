@@ -66,7 +66,7 @@ h36m_joint_names_raw = ['Hips', 'RHip', 'RKnee', 'RFoot', 'RFoot_dummy', 'RToe_d
 # Perform the same joint removal and rewiring as the model's source code
 joints_to_remove = [4, 5, 9, 10, 11, 16, 20, 21, 22, 23, 24, 28, 29, 30, 31]
 h36m_skeleton_17 = h36m_skeleton_raw
-h36m_skeleton_17.remove_joints(joints_to_remove)
+valid_joints = h36m_skeleton_17.remove_joints(joints_to_remove)
 h36m_skeleton_17._parents[11] = 8 # Rewire LShoulder
 h36m_skeleton_17._parents[14] = 8 # Rewire RShoulder
 
@@ -110,12 +110,13 @@ def rotation_matrix_from_vectors(vec1, vec2):
     kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
     return np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
 
-def get_joint_positions(keypoints_array):
+def get_joint_positions(keypoints_array, keypoint_map):
     joint_positions = {}
-    for bone_name, kp_indices in KEYPOINT_MAP.items():
+    for bone_name, kp_indices in keypoint_map.items():
         idx = kp_indices[0]
-        if idx * 4 + 2 < len(keypoints_array):
-            joint_positions[bone_name] = keypoints_array[idx*4 : idx*4+3]
+        # The input from VideoPose3D is already (N, 3), not (N, 4)
+        if idx < len(keypoints_array):
+            joint_positions[bone_name] = keypoints_array[idx]
         else:
             joint_positions[bone_name] = np.array([0.0, 0.0, 0.0])
     return joint_positions
@@ -127,26 +128,25 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
         data_from_videopose = json.load(f)
 
     # Adapt the VideoPose3D JSON structure
-    data_3d = []
+    person_data_3d = []
     for frame_data in data_from_videopose:
-        # The data contains a list of people, we take the first one.
         if frame_data["keypoints"]:
-            person_keypoints = frame_data["keypoints"][0]
-            # Flatten the list of lists into a single list with confidence values
-            flat_keypoints = []
-            for kp in person_keypoints:
-                flat_keypoints.extend(kp[:3]) # Add x, y, z
-                flat_keypoints.append(1.0) # Add confidence of 1.0
-            data_3d.append({"pose_keypoints_3d": flat_keypoints})
+            # Data is nested: list of frames -> list of people -> list of keypoints
+            person_keypoints = frame_data["keypoints"][0] # Take the first person
+            person_data_3d.append(np.array(person_keypoints)[:, :3]) # Use only x,y,z
         else:
-            data_3d.append({"pose_keypoints_3d": []})
+            person_data_3d.append(np.array([]))
+
+    if not person_data_3d:
+        print("No valid keypoint data found. Aborting.")
+        return
 
     print("Generating BVH based on VideoPose3D's exact skeleton specification...")
     
     first_valid_frame_keypoints = None
-    for frame_data in data_3d:
-        if frame_data["pose_keypoints_3d"]:
-            first_valid_frame_keypoints = np.array(frame_data["pose_keypoints_3d"])
+    for keypoints in person_data_3d:
+        if keypoints.size > 0:
+            first_valid_frame_keypoints = keypoints
             break
     
     if first_valid_frame_keypoints is None:
@@ -154,11 +154,10 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
         return
 
     # The data from VideoPose3D is already in a good coordinate system.
-    # No initial rotation is needed, unlike the previous model.
-    rest_joint_positions = get_joint_positions(first_valid_frame_keypoints)
+    rest_joint_positions = get_joint_positions(first_valid_frame_keypoints, KEYPOINT_MAP)
 
     offsets = {}
-    for bone_name in BVH_SKELETON:
+    for bone_name in h36m_joint_names_17:
         bone_info = BVH_SKELETON[bone_name]
         if bone_info["parent"] is None:
             offsets[bone_name] = np.array([0.0, 0.0, 0.0])
@@ -171,9 +170,8 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
     for bone_name, offset_vec in offsets.items():
         bone_length = np.linalg.norm(offset_vec)
         if bone_length < 1e-6:
-            ideal_rest_pose_vectors[bone_name] = np.array([0.0, 0.0, 1.0])
+            ideal_rest_pose_vectors[bone_name] = np.array([0.0, 1.0, 0.0]) # Default to Y-up
             continue
-        # Use the calculated offset as the rest pose vector
         ideal_rest_pose_vectors[bone_name] = offset_vec / bone_length
 
     bvh_container = BvhContainer()
@@ -191,17 +189,16 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
         for child_bone in bone_info["children"]:
             create_bvh_joint(child_bone, bvh_joint)
 
-    create_bvh_joint(h36m_joint_names_17[0]) # Start with the root joint name
+    create_bvh_joint(h36m_joint_names_17[0])
     bvh_container.Root = bvh_joints[h36m_joint_names_17[0]]
 
-    for frame_data in data_3d:
-        if not frame_data["pose_keypoints_3d"]:
+    for frame_keypoints in person_data_3d:
+        if frame_keypoints.size == 0:
             for joint_name in bvh_joints:
                 bvh_joints[joint_name].Keyframes.append(Pose(glm.vec3(0,0,0), glm.quat(1,0,0,0)))
             continue
 
-        current_keypoints = np.array(frame_data["pose_keypoints_3d"])
-        current_joint_positions = get_joint_positions(current_keypoints)
+        current_joint_positions = get_joint_positions(frame_keypoints, KEYPOINT_MAP)
 
         for joint_name, bvh_joint in bvh_joints.items():
             bone_info = BVH_SKELETON[joint_name]
@@ -212,7 +209,7 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
                 root_pos = current_joint_positions[joint_name]
                 position = glm.vec3(root_pos[0], root_pos[1], root_pos[2])
                 
-                child_name = bone_info["children"][0] # Use first child for root rotation
+                child_name = bone_info["children"][0]
                 current_bone_vec = current_joint_positions[child_name] - root_pos
                 rest_pose_vec = ideal_rest_pose_vectors[child_name]
                 R = rotation_matrix_from_vectors(rest_pose_vec, current_bone_vec)
@@ -227,7 +224,7 @@ def convert_json_to_bvh_bvhio(input_json_path, output_dir):
             
             bvh_joint.Keyframes.append(Pose(position, rotation))
 
-    bvh_container.FrameCount = len(data_3d)
+    bvh_container.FrameCount = len(person_data_3d)
 
     filename_without_ext = os.path.splitext(os.path.basename(input_json_path))[0]
     base_filename = filename_without_ext.replace('_videopose3d_smoothed_3d_keypoints', '')
