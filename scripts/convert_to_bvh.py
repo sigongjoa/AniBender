@@ -4,13 +4,13 @@ import numpy as np
 import argparse
 import mediapipe as mp # Added import for mediapipe
 
-# Define the 17 keypoints from YOLO-pose
-# 0: nose, 1: left_eye, 2: right_eye, 3: left_ear, 4: right_ear,
-# 5: left_shoulder, 6: right_shoulder, 7: left_elbow, 8: right_elbow,
-# 9: left_wrist, 10: right_wrist, 11: left_hip, 12: right_hip,
-# 13: left_knee, 14: right_knee, 15: left_ankle, 16: right_ankle
+# Define the 19 keypoints from Lightweight Human Pose Estimation 3D Demo
+# 0: nose, 1: neck, 2: right_shoulder, 3: right_elbow, 4: right_wrist,
+# 5: left_shoulder, 6: left_elbow, 7: left_wrist, 8: right_hip, 9: right_knee,
+# 10: right_ankle, 11: left_hip, 12: left_knee, 13: left_ankle, 14: right_eye,
+# 15: left_eye, 16: right_ear, 17: left_ear, 18: background (ignored)
 
-# Simplified BVH skeleton definition and mapping to YOLO-pose keypoints
+# Simplified BVH skeleton definition and mapping to Lightweight keypoints
 # This is a conceptual mapping. Actual bone lengths and orientations
 # would need to be calibrated for a specific avatar.
 BVH_SKELETON = {
@@ -34,27 +34,26 @@ BVH_SKELETON = {
     "RightFoot": {"parent": "RightLeg", "channels": ["Zrotation", "Xrotation", "Yrotation"], "children": []}, # Placeholder for ankle
 }
 
-# Mapping from BVH bone names to the 17-keypoint array indices saved from run_pose_estimation_mediapipe.py
-# This assumes the order of keypoints in the saved JSON is consistent with the mp_to_yolo_map_indices in that script.
+# Mapping from BVH bone names to the 19-keypoint array indices from Lightweight Human Pose Estimation 3D Demo
 KEYPOINT_MAP = {
-    "Hips": [11, 12], # Left Hip (11), Right Hip (12)
-    "Spine": [5, 6],  # Left Shoulder (5), Right Shoulder (6)
-    "Neck": [0],      # Nose (0)
+    "Hips": [8, 11], # Midpoint of Right Hip (8) and Left Hip (11)
+    "Spine": [1],  # Neck (1)
+    "Neck": [1],      # Neck (1)
     "Head": [0],      # Nose (0)
-    "LeftShoulder": [5],
-    "LeftArm": [5, 7], # Left Shoulder (5) to Left Elbow (7)
-    "LeftForeArm": [7, 9], # Left Elbow (7) to Left Wrist (9)
-    "LeftHand": [9], # Left Wrist (9)
-    "RightShoulder": [6],
-    "RightArm": [6, 8], # Right Shoulder (6) to Right Elbow (8)
-    "RightForeArm": [8, 10], # Right Elbow (8) to Right Wrist (10)
-    "RightHand": [10], # Right Wrist (10)
-    "LeftUpLeg": [11, 13], # Left Hip (11) to Left Knee (13)
-    "LeftLeg": [13, 15], # Left Knee (13) to Left Ankle (15)
-    "LeftFoot": [15], # Left Ankle (15)
-    "RightUpLeg": [12, 14], # Right Hip (12) to Right Knee (14)
-    "RightLeg": [14, 16], # Right Knee (14) to Right Ankle (16)
-    "RightFoot": [16], # Right Ankle (16)
+    "LeftShoulder": [5], # Left Shoulder (5)
+    "LeftArm": [5, 6], # Left Shoulder (5) to Left Elbow (6)
+    "LeftForeArm": [6, 7], # Left Elbow (6) to Left Wrist (7)
+    "LeftHand": [7], # Left Wrist (7)
+    "RightShoulder": [2], # Right Shoulder (2)
+    "RightArm": [2, 3], # Right Shoulder (2) to Right Elbow (3)
+    "RightForeArm": [3, 4], # Right Elbow (3) to Right Wrist (4)
+    "RightHand": [4], # Right Wrist (4)
+    "LeftUpLeg": [11, 12], # Left Hip (11) to Left Knee (12)
+    "LeftLeg": [12, 13], # Left Knee (12) to Left Ankle (13)
+    "LeftFoot": [13], # Left Ankle (13)
+    "RightUpLeg": [8, 9], # Right Hip (8) to Right Knee (9)
+    "RightLeg": [9, 10], # Right Knee (9) to Right Ankle (10)
+    "RightFoot": [10], # Right Ankle (10)
 }
 
 # Define the default orientation vector for each bone in a T-pose (Y-up, Z-forward)
@@ -187,15 +186,18 @@ def convert_to_bvh(input_json_path, output_dir):
                 joint_positions_map[bone_name] = first_valid_frame_keypoints[valid_kp_indices[0], :3]
             elif len(valid_kp_indices) == 2:
                 joint_positions_map[bone_name] = (first_valid_frame_keypoints[valid_kp_indices[0], :3] + first_valid_frame_keypoints[valid_kp_indices[1], :3]) / 2
-            else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 17-keypoint array)
+            else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 19-keypoint array)
                 if bone_name == "Head":
-                    joint_positions_map[bone_name] = first_valid_frame_keypoints[0, :3] # Nose (index 0 in 17-keypoint array)
-                elif bone_name == "Spine":
-                    joint_positions_map[bone_name] = (first_valid_frame_keypoints[5, :3] + first_valid_frame_keypoints[6, :3]) / 2 # Mid-shoulder (indices 5, 6)
-                elif bone_name == "Hips":
-                    joint_positions_map[bone_name] = (first_valid_frame_keypoints[11, :3] + first_valid_frame_keypoints[12, :3]) / 2 # Mid-hip (indices 11, 12)
-                elif bone_name == "Neck":
                     joint_positions_map[bone_name] = first_valid_frame_keypoints[0, :3] # Nose (index 0)
+                elif bone_name == "Spine":
+                    # Midpoint of Neck and Hips
+                    neck_pos = first_valid_frame_keypoints[1, :3]
+                    hips_mid_pos = (first_valid_frame_keypoints[8, :3] + first_valid_frame_keypoints[11, :3]) / 2
+                    joint_positions_map[bone_name] = (neck_pos + hips_mid_pos) / 2
+                elif bone_name == "Hips":
+                    joint_positions_map[bone_name] = (first_valid_frame_keypoints[8, :3] + first_valid_frame_keypoints[11, :3]) / 2 # Mid-hip (indices 8, 11)
+                elif bone_name == "Neck":
+                    joint_positions_map[bone_name] = first_valid_frame_keypoints[1, :3] # Neck (index 1)
 
         # Calculate offsets for BVH HIERARCHY section
         # For MediaPipe world_landmarks, Hips is already at (0,0,0) relative to its own coordinate system
@@ -279,14 +281,18 @@ def convert_to_bvh(input_json_path, output_dir):
                 elif len(valid_kp_indices) == 2:
                     current_joint_positions_map[bone_name] = (person_keypoints_current_frame[valid_kp_indices[0], :3] + person_keypoints_current_frame[valid_kp_indices[1], :3]) / 2
                 else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 17-keypoint array)
-                    if bone_name == "Head":
-                        current_joint_positions_map[bone_name] = person_keypoints_current_frame[0, :3] # Nose (index 0 in 17-keypoint array)
-                    elif bone_name == "Spine":
-                        current_joint_positions_map[bone_name] = (person_keypoints_current_frame[5, :3] + person_keypoints_current_frame[6, :3]) / 2 # Mid-shoulder (indices 5, 6)
-                    elif bone_name == "Hips":
-                        current_joint_positions_map[bone_name] = (person_keypoints_current_frame[11, :3] + person_keypoints_current_frame[12, :3]) / 2 # Mid-hip (indices 11, 12)
-                    elif bone_name == "Neck":
-                        current_joint_positions_map[bone_name] = person_keypoints_current_frame[0, :3] # Nose (index 0)
+                    else: # Handle special cases like Spine, Hips, Neck, Head (using hardcoded indices from 19-keypoint array)
+                if bone_name == "Head":
+                    current_joint_positions_map[bone_name] = person_keypoints_current_frame[0, :3] # Nose (index 0)
+                elif bone_name == "Spine":
+                    # Midpoint of Neck and Hips
+                    neck_pos = person_keypoints_current_frame[1, :3]
+                    hips_mid_pos = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2
+                    current_joint_positions_map[bone_name] = (neck_pos + hips_mid_pos) / 2
+                elif bone_name == "Hips":
+                    current_joint_positions_map[bone_name] = (person_keypoints_current_frame[8, :3] + person_keypoints_current_frame[11, :3]) / 2 # Mid-hip (indices 8, 11)
+                elif bone_name == "Neck":
+                    current_joint_positions_map[bone_name] = person_keypoints_current_frame[1, :3] # Neck (index 1)
 
             # Calculate rotations for each bone
             for bone_name, bone_info in BVH_SKELETON.items():
