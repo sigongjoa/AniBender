@@ -47,8 +47,7 @@ def stitch_poses(all_chunk_predictions, video_length, chunk_size, overlap_size):
     predictions_by_frame = [[] for _ in range(video_length)]
     for frame_data in all_chunk_predictions:
         # DEBUG PRINT
-        print(f"DEBUG: Processing frame_data type: {type(frame_data)}")
-        print(f"DEBUG: Processing frame_data content: {frame_data}")
+        
 
         original_frame_idx = frame_data['frame_idx']
         if original_frame_idx < video_length: # Ensure we don't go out of bounds
@@ -83,6 +82,9 @@ def main():
     parser.add_argument('--output_base_dir', type=str, default="output_data", help="Base directory for all output files.")
     parser.add_argument('--chunk_size', type=int, default=243, help="Number of frames to process in each chunk.")
     parser.add_argument('--overlap_size', type=int, default=121, help="Number of overlapping frames between chunks.")
+    parser.add_argument('--smoothing_method', type=str, default="moving_average",
+                        choices=["moving_average", "savgol", "one_euro", "none"],
+                        help="Smoothing method to apply in apply_smoothing.py.")
 
     args = parser.parse_args()
 
@@ -144,7 +146,7 @@ def main():
         # Step 4: Temporal Smoothing
         output_smoothed_3d_json_chunk = os.path.join(absolute_output_base_dir, f'{video_filename_base}_chunk{chunk_idx}_videopose3d_smoothed_3d_keypoints.json')
         run_command(
-            f"scripts/apply_smoothing.py --input_json_path \"{output_3d_json_chunk}\" --output_dir \"{absolute_output_base_dir}\"",
+            f"scripts/apply_smoothing.py --input_json_path \"{output_3d_json_chunk}\" --output_dir \"{absolute_output_base_dir}\" --method {args.smoothing_method}",
             f"Applying Temporal Smoothing (Chunk {chunk_idx + 1})"
         )
         
