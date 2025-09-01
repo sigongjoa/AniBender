@@ -56,9 +56,9 @@ def main():
         "Applying Temporal Smoothing"
     )
 
-    # Step 5: Convert to BVH (generates multiple BVH files if multiple people detected)
+    # Step 5: Convert to BVH using the corrected script
     run_command(
-        f"venv/bin/python scripts/convert_to_bvh.py --input_json_path '{output_smoothed_3d_json}' --output_dir '{args.output_base_dir}'",
+        f"venv/bin/python scripts/convert_json_to_bvh_bvhio.py --input_json_path '{output_smoothed_3d_json}' --output_dir '{args.output_base_dir}'",
         "Converting to BVH"
     )
 
