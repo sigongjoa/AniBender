@@ -108,6 +108,34 @@ Example output files for a video named `my_video.mp4`:
 -   `output_data/bvh_animation_videopose3d_person1_3d.mp4` (Visualization video for VideoPose3D pipeline)
 -   `output_data/bvh_animation_vibe_person1_3d.mp4` (Visualization video for VIBE pipeline)
 
+## Advanced Usage and Debugging
+
+Beyond the main pipelines, several scripts can be used for debugging and manual processing.
+
+### 1. Visualization Pipeline
+
+To debug the output of the 3D pose estimation, a dedicated visualization pipeline can be run. This pipeline does not generate a BVH file but instead produces video overlays and data logs.
+
+```bash
+python3 run_full_pipeline.py --video "input_videos/your_video.mp4"
+```
+
+This will generate the following files in `output_data/`:
+-   `video_2d_overlay.mp4`: The original video with the 2D skeleton drawn on top.
+-   `video_3d_overlay.mp4`: The original video with the projected 3D skeleton drawn on top.
+-   `2d_keypoints.txt`: A frame-by-frame log of the 2D keypoint coordinates.
+-   `3d_keypoints.txt`: A frame-by-frame log of the 3D keypoint coordinates.
+
+### 2. Manual BVH Conversion
+
+If you have a JSON file containing 3D keypoints from the `VideoPose3D` pipeline, you can manually convert it to BVH using the corrected conversion script:
+
+```bash
+python3 venv/bin/python scripts/convert_json_to_bvh_bvhio.py --input_json_path "output_data/your_video_videopose3d_smoothed_3d_keypoints.json" --output_dir "output_data"
+```
+
+This script uses the ground-truth skeleton definition from the VideoPose3D model to ensure an accurate conversion.
+
 ## Future Work & Improvements
 
 -   **Unified Pipeline**: Integrate both YOLO+VideoPose3D and VIBE into a single, more flexible pipeline with options to choose the desired 3D estimation backend.
