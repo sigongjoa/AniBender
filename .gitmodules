@@ -1,0 +1,9 @@
+[submodule "models/VIBE"]
+	path = models/VIBE
+	url = https://github.com/mkocabas/VIBE.git
+[submodule "models/VideoPose3D"]
+	path = models/VideoPose3D
+	url = https://github.com/facebookresearch/VideoPose3D.git
+[submodule "models/lightweight-human-pose-estimation-3d-demo"]
+	path = models/lightweight-human-pose-estimation-3d-demo
+	url = https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.git
